@@ -1,0 +1,110 @@
+body{
+	background: black;
+	color: white;
+	font-size:16px;
+}
+pre {font-family:"Courier";}
+
+.keyword{
+	background: black;
+	color: #00FF00;
+
+}
+
+.const{
+	background: black;
+	color: #FF0000;
+}
+.string{
+	background: black;
+	color: #FFFF00;
+
+}
+.comment{
+	background: black;
+	color: #00FFFF;
+}
+
+.other{
+	background: black;
+	color: white;
+}
+
+	/*	ATTR_UNDEF,*/
+.c0{
+	background: black;
+	color: white;
+}
+/*	ATTR_FUNC,*/
+.c1{
+	background: black;
+	color: white;
+}
+/*	ATTR_FUNC_DEF,*/
+.c2{
+	background: DarkKhaki;
+	color: blue;
+	font-weight:bold;
+	
+}
+/*	ATTR_FUNC_DECL,*/
+.c3{
+	background: DarkKhaki;
+	color: blue;
+	font-style:italic
+}
+/*	ATTR_FUNC_REF,*/
+.c4{
+	background: LightBlue;
+	color: blue;
+}
+/*	ATTR_VAR_DEF,*/
+.c5{
+	background: DarkKhaki;
+	color: red;
+}
+/*	ATTR_VAR_REF,*/
+.c6{
+	background: LightBlue;
+	color: red;
+}
+/*	ATTR_STRUCT_DEF,*/
+.c7{
+	background: DarkKhaki;
+	color: black;
+}
+/*	ATTR_STRUCT_REF,*/
+.c8{
+	background: LightBlue;
+	color: black;
+}
+/*	ATTR_STRUCT_MEMBER_DEF,*/
+.c9{
+	background: DarkKhaki;
+	color: #FFFF00;
+}
+/*	ATTR_STRUCT_MEMBER_REF,*/
+.c10{
+	background: LightBlue;
+	color: #FFFF00;
+}
+/*	ATTR_ENUM_MEMBER_DEF,*/
+.c11{
+	background: DarkKhaki;
+	color: #9932CC;
+}
+/*	ATTR_ENUM_MEMBER_REF,*/
+.c12{
+	background: LightBlue;
+	color: #9932CC;
+}
+/*	ATTR_TYPEDEF_DEF,*/
+.c13{
+	background: DarkKhaki;
+	color: #008080;
+}
+/*	ATTR_TYPEDEF_REF*/
+.c14{
+	background: LightBlue;
+	color: #008080;
+}
