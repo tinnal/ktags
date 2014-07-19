@@ -104,35 +104,39 @@ dodefine(TokenNode **currNode)
 	}
 
 	/* collect macro body */
-	for(;;)
+	for (; (*currNode)->mime->tokenType!= NEWLINE && (*currNode)->mime->tokenType!= EOFILE; 
+		(*currNode) = (*currNode)->next )
 	{
 		int argNo = 0;
-		if(token == NULL)
-			return;
-		if(token->tokenType== NEWLINE)
-			break;
 		for (argNode=macro->args.next; argNode != &macro->args; 
 			argNode =argNode->next ){
-			if (strcmp((char*)argNode->mime->name, token->name)==0){
-				token->ppDef = argNode->mime;
-				token->ppArgNo = argNo;
+			if (strcmp((char*)argNode->mime->name, (*currNode)->mime->name)==0){
+				(*currNode)->mime->ppDef = argNode->mime;
+				(*currNode)->mime->ppArgNo = argNo;
 			}
 			argNo++;
 		}		
-		AddToken(&macro->body, token);
-		token = NextToken(currNode);
+		AddToken(&macro->body, (*currNode)->mime);
 	}
 }
 
+
+inline MyToken* InstantiateArg(MyToken **actualArgs, MyToken *token)
+{
+	if(token->ppDef != NULL)
+		//token is format arg, translate it into actual argument.
+		return actualArgs[token->ppArgNo];
+	else
+		return token;	
+}
 
 TokenNode* expand(TokenNode *tokenNode, Macro *macro)
 {
 	TokenNode *beganTokenNode = tokenNode;
 	TokenNode *currNode = tokenNode;
-	TokenNode *bodyNode, *appendNode, *delNode, *saveNode, *ret;
-	MyToken *token, **ArgsArray, *nextToken;
+	TokenNode *bodyNode, *insertPoint, *delNode, *saveNode, *ret;
+	MyToken *token, **ArgsArray, *token1, *token2;
 	MyToken *currToken, *newToken;
-	char *orgName1, *orgName2;
 	
 	// collect arguments 
 	token = NextToken(&currNode);
@@ -174,55 +178,54 @@ TokenNode* expand(TokenNode *tokenNode, Macro *macro)
 		token = NextToken(&currNode);
 	}
 
+	//del the original tokens
+	for (delNode=beganTokenNode; delNode != currNode; delNode = delNode->next){
+		delNode = DelTokenNode(delNode);
+	}	
+
 	//insert the expanded token
 	//ret = appendNode = AddToken(beganTokenNode, token);
-	appendNode = currNode->prev;
+	insertPoint = currNode->prev;
 	ret = beganTokenNode->prev;
 	for (bodyNode=macro->body.next; bodyNode != &macro->body; 
 		bodyNode =bodyNode->next )
 	{
-		if(bodyNode->mime->ppDef != NULL){
-			appendNode = AddToken(appendNode, ArgsArray[bodyNode->mime->ppArgNo]);
-		} else if(bodyNode->mime->tokenType == PP_DSHARP){
-			orgName1 = bodyNode->prev->mime->name;
-			nextToken = NextToken(&bodyNode);
-			if(nextToken == NULL) 
-				;//TODO: add error hander
-			orgName2 = nextToken->name;
+		switch(bodyNode->mime->tokenType)
+		{
+		case ID:
+			insertPoint = InsertToken(insertPoint, InstantiateArg(ArgsArray,bodyNode->mime));
+			break;
+		case PP_DSHARP:
+			//Pop the prev token we had processed.
+			token1 = insertPoint->mime;
+			insertPoint = DelTokenNode(insertPoint);
+			token2 = NextToken(&bodyNode);//TODO: ERROR
+			token2 = InstantiateArg(ArgsArray,token2);
 			newToken = (MyToken*)malloc(sizeof(MyToken));
 			memset(newToken, 0 , sizeof(MyToken));
 			newToken->genToken1 = bodyNode->prev->mime;
-			newToken->genToken2 = nextToken;
+			newToken->genToken2 = token1;
 			newToken->tokenType = ID;
-			newToken->name = (char*)malloc(strlen(orgName1)+strlen(orgName2)+1);
-			sprintf(newToken->name, "%s%s", orgName1, orgName2);
-			appendNode = AddToken(appendNode, newToken);
-			//TODO: fix pos info
-		} else if(bodyNode->mime->tokenType == PP_SHARP){	
-			nextToken = NextToken(&bodyNode);
-			if(nextToken == NULL) 
-				;//TODO: add error hander
-			orgName2 = nextToken->name;
-
+			newToken->name = (char*)malloc(strlen(token1->name)+strlen(token2->name)+1);
+			sprintf(newToken->name, "%s%s", token1->name, token2->name);
+			insertPoint = InsertToken(insertPoint, newToken);
+			break;
+		case PP_SHARP:
+			token1 = NextToken(&bodyNode); //TODO: ERROR
+			token1 = InstantiateArg(ArgsArray,token1);
 			newToken = (MyToken*)malloc(sizeof(MyToken));
 			memset(newToken, 0 , sizeof(MyToken));
 			newToken->genToken1 = bodyNode->mime;
 			newToken->tokenType = SCON;
-			newToken->name = (char*)malloc(strlen(orgName2)+3);
-			sprintf(newToken->name, "\"%s\"", nextToken->name, orgName2);
-			appendNode = AddToken(appendNode, newToken);
-			//TODO: fix pos info
-		} else if(bodyNode->next->mime->tokenType != PP_DSHARP){
-			appendNode = AddToken(appendNode, bodyNode->mime);
-		}				
+			newToken->name = (char*)malloc(strlen(token1->name)+3);
+			sprintf(newToken->name, "\"%s\"", token1->name, token1->name);
+			insertPoint = InsertToken(insertPoint, newToken);
+			break;
+		default:
+			insertPoint = InsertToken(insertPoint, bodyNode->mime);
+			break;
+		}			
 	}
-
-	//del the original tokens
-	for (delNode=beganTokenNode; saveNode != currNode;){
-		saveNode = delNode->next;
-		DelToken(delNode);
-		delNode = saveNode;
-	}	
 	
 	return ret;
 }

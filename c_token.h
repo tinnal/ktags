@@ -160,7 +160,10 @@ typedef struct _TokenNode
 int OpenTokenFile(char *fileName, TokenNode *tokenList);
 MyToken* NextToken(TokenNode** nextNode);
 TokenNode*  AddToken(TokenNode* tokenList,  MyToken* token);
-void DelToken(TokenNode* delToken);
+TokenNode* DelTokenNode(TokenNode* delTokenNode);
+
+TokenNode* InsertToken(TokenNode* insertPoint,  MyToken* token);
+
 MyToken* NewToken(char *file, long startLine, long startCol,
 	long endLine, long endCol, char* tokenStart, char* tokenEnd, int type);
 

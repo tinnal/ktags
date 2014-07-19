@@ -39,6 +39,14 @@ MyToken* NewToken(char *file, long startLine, long startCol,
 	return token;
 }
 
+/*
+PushToken(TokenNode* tokenStack, MyToken* token)
+{
+}
+
+MyToken* PopToken(TokenNode* tokenStack)
+{
+}*/
 
 TokenNode* AddToken(TokenNode* tokenList,  MyToken* token)
 {
@@ -57,12 +65,40 @@ TokenNode* AddToken(TokenNode* tokenList,  MyToken* token)
 	return tokenNode;
 }
 
-void DelToken(TokenNode* delToken)
+TokenNode* DelTokenNode(TokenNode* delTokenNode)
 {
-	delToken->prev->next = delToken->next;
-	delToken->next->prev = delToken->prev;
-	free(delToken);
+	TokenNode *nextNode;
+	printf("del token %s\n",delTokenNode->mime->name);
+	delTokenNode->prev->next = delTokenNode->next;
+	delTokenNode->next->prev = delTokenNode->prev;
+	nextNode = delTokenNode->prev;
+	free(delTokenNode);
+	return nextNode;
 }
+
+
+TokenNode* InsertToken(TokenNode* insertPoint,  MyToken* token)
+{
+	if(token == NULL || insertPoint == NULL)
+		return NULL;
+	TokenNode *newTokenNode = NULL;
+	printf("intert token %s\n",token->name);
+	if((newTokenNode = (TokenNode*)malloc(sizeof(TokenNode))) == NULL)
+		return NULL;
+	memset(newTokenNode, 0, sizeof(TokenNode));
+	newTokenNode->mime = token;
+
+	newTokenNode->next = insertPoint->next;
+	newTokenNode->prev = insertPoint;
+	insertPoint->next->prev = newTokenNode;
+	insertPoint->next = newTokenNode;
+
+	return newTokenNode;
+}
+
+
+
+
 
 MyToken* NextToken(TokenNode** nextNode)
 {

@@ -1,2 +1,2 @@
-# define dd(aa)  aa
-dd(tinnal)
+# define dd(aa) aa  ##      grace end
+dd  (tinnal)bb
