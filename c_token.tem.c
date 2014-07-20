@@ -124,35 +124,16 @@ retry:
 	NewToken(fileName, startLine, startCol, endLine, endCol, yyToken, yyCursor,(X))); \
 	}
 
-
-
-int OpenTokenFile(char *fileName, TokenNode *tokenList){
-	char *buffer, *lineStart;
+int Lex(char* fileName, char* buf, int bufLen, TokenNode* tokenList)
+{
+	char *lineStart;
 	char *yyMarker, *yyLimit, *yyCursor, *yyToken;
 	int currLine = 0, startLine = 0, startCol = 0, endLine = 0, endCol = 0;
-	int fileSize, readCount;
-	FILE* tokenFd;
 	int currPos;
 
-	tokenFd = fopen(fileName, "rb");
-	if(tokenFd == NULL)
-		return -1;
-	fseek(tokenFd, 0, SEEK_END);
-	fileSize = ftell(tokenFd);
-	fseek(tokenFd, 0, SEEK_SET);
-	buffer = (char*)malloc(fileSize+1);
-	if(buffer == NULL) return -1;
-	lineStart = yyCursor = yyToken = yyMarker = buffer;
-	yyLimit = buffer + fileSize;
+	lineStart = yyCursor = yyToken = yyMarker = buf;
+	yyLimit = buf + bufLen;
 
-	readCount= 0;
-	while(readCount != fileSize)
-	{
-		readCount += fread(buffer+readCount, 1, 4096, tokenFd);
-	}
-	buffer[readCount] = 0;
-
-	fclose(tokenFd);
 	
 	for(;;)
 	{
@@ -302,7 +283,7 @@ int OpenTokenFile(char *fileName, TokenNode *tokenList){
 			currLine++;
 			continue;
 		}
-		"\000"		{ADD_TOKEN(EOFILE); free(buffer); return 0; }
+		"\000"		{ADD_TOKEN(EOFILE); return 0; }
 		any
 		{
 			printf("unexpected character: %c\n", yyToken);
@@ -333,4 +314,35 @@ int OpenTokenFile(char *fileName, TokenNode *tokenList){
 		*/
 	}
 }
+
+
+int OpenTokenFile(char *fileName, TokenNode *tokenList)
+{
+	int fileSize, readCount;
+	FILE* tokenFd;
+	char* buffer;
+
+	tokenFd = fopen(fileName, "rb");
+	if(tokenFd == NULL)
+		return -1;
+	fseek(tokenFd, 0, SEEK_END);
+	fileSize = ftell(tokenFd);
+	fseek(tokenFd, 0, SEEK_SET);
+	buffer = (char*)malloc(fileSize+1);
+	if(buffer == NULL) return -1;
+
+	readCount= 0;
+	while(readCount != fileSize)
+	{
+		readCount += fread(buffer+readCount, 1, 4096, tokenFd);
+	}
+	buffer[readCount] = 0;
+
+	fclose(tokenFd);
+
+	Lex(fileName, buffer, fileSize, tokenList);
+
+	free(buffer);	
+}
+
 

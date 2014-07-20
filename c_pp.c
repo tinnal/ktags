@@ -120,68 +120,66 @@ dodefine(TokenNode **currNode)
 	}
 }
 
-
-inline MyToken* InstantiateArg(MyToken **actualArgs, MyToken *token)
-{
-	if(token->ppDef != NULL)
-		//token is format arg, translate it into actual argument.
-		return actualArgs[token->ppArgNo];
-	else
-		return token;	
-}
-
+#define ARG_RANGE_BEGAN 0
+#define ARG_RANGE_END 1
 TokenNode* expand(TokenNode *tokenNode, Macro *macro)
 {
-	TokenNode *beganTokenNode = tokenNode;
-	TokenNode *currNode = tokenNode;
+	TokenNode *beganTokenNode = tokenNode, *endTokenNode;
+	TokenNode *currNode = tokenNode, *prevNode, **ArgsRange;
 	TokenNode *bodyNode, *insertPoint, *delNode, *saveNode, *ret;
-	MyToken *token, **ArgsArray, *token1, *token2;
+	MyToken *token, *token1, *token2;
 	MyToken *currToken, *newToken;
+	int stringSize;
+	char* newString;
+	TokenNode dSharpList;
 	
-	// collect arguments 
+	// collect actual arguments 
+	endTokenNode = currNode;
 	token = NextToken(&currNode);
 	if (token && token->tokenType=='(') {
 		/* macro with args */
 		int narg = 0;
-		ArgsArray = (MyToken**)malloc(sizeof(MyToken*)*(macro->argsCount));
+		ArgsRange = (TokenNode**)malloc(sizeof(MyToken*) * (macro->argsCount) * 2);
+		memset(ArgsRange, 0, sizeof(MyToken*) * (macro->argsCount) * 2);
 		token = NextToken(&currNode);
 		if (token->tokenType!=')') {
 			int err = 0;
+			ArgsRange[narg*2+ARG_RANGE_BEGAN] = currNode;
 			for (;;) {
-				if (token->tokenType!=ID) {
-					err++;
+				token = NextToken(&currNode);
+				if (token->tokenType==')'){
+					//kict out whitespace
+					ArgsRange[narg*2+ARG_RANGE_END] =
+					currNode->prev->mime->tokenType == SPACE?
+					currNode->prev:currNode;
 					break;
 				}
-				ArgsArray[narg] = token;
-				if (++narg > macro->argsCount){
-					err++;
-					break;
-				}
+				else if (token->tokenType==',') {
+					//kict out whitespace
+					ArgsRange[narg*2+ARG_RANGE_END] =
+					currNode->prev->mime->tokenType == SPACE?
+					currNode->prev:currNode;
 
-				token = NextToken(&currNode);
-				if (token->tokenType==')')
-					break;
-				if (token->tokenType!=',') {
-					err++;
-					break;
-				}
-				token = NextToken(&currNode);
+					if (++narg > macro->argsCount){
+						err++;
+						break;
+					}
+					token = NextToken(&currNode);
+					ArgsRange[narg*2+ARG_RANGE_BEGAN] = currNode;
+				}			
 			}
-
 			if (err) {
-				free(ArgsArray);
+				free(ArgsRange);
 				error("Syntax error in macro parameters");
 				return NULL;
 			}
 
 		}
+		endTokenNode = currNode; //update endTokenNode if we have argument.
 		token = NextToken(&currNode);
 	}
+	
 
-	//del the original tokens
-	for (delNode=beganTokenNode; delNode != currNode; delNode = delNode->next){
-		delNode = DelTokenNode(delNode);
-	}	
 
 	//insert the expanded token
 	//ret = appendNode = AddToken(beganTokenNode, token);
@@ -193,32 +191,97 @@ TokenNode* expand(TokenNode *tokenNode, Macro *macro)
 		switch(bodyNode->mime->tokenType)
 		{
 		case ID:
-			insertPoint = InsertToken(insertPoint, InstantiateArg(ArgsArray,bodyNode->mime));
+			if(bodyNode->mime->ppDef != NULL) {
+				//token is format arg, translate it into actual argument.
+				for(currNode = ArgsRange[bodyNode->mime->ppArgNo*2+ARG_RANGE_BEGAN];
+					currNode != ArgsRange[bodyNode->mime->ppArgNo*2+ARG_RANGE_END];
+					currNode =  currNode->next){
+					insertPoint = InsertToken(insertPoint, currNode->mime);
+				}
+			} else{
+				insertPoint = InsertToken(insertPoint, bodyNode->mime);
+			}
+
+			//insertPoint = InsertToken(insertPoint, InstantiateArg(ArgsArray,bodyNode->mime));
 			break;
 		case PP_DSHARP:
-			//Pop the prev token we had processed.
+			/*	Pop the prev token we had processed, check if it will merged with the first token we insert.
+			etc:
+				to ## ken 	-> merge into 'token'
+				12 ## +		-> not merge */
+			//1. merge two token string.
 			token1 = insertPoint->mime;
-			insertPoint = DelTokenNode(insertPoint);
-			token2 = NextToken(&bodyNode);//TODO: ERROR
-			token2 = InstantiateArg(ArgsArray,token2);
-			newToken = (MyToken*)malloc(sizeof(MyToken));
-			memset(newToken, 0 , sizeof(MyToken));
-			newToken->genToken1 = bodyNode->prev->mime;
-			newToken->genToken2 = token1;
-			newToken->tokenType = ID;
-			newToken->name = (char*)malloc(strlen(token1->name)+strlen(token2->name)+1);
-			sprintf(newToken->name, "%s%s", token1->name, token2->name);
-			insertPoint = InsertToken(insertPoint, newToken);
+			//insertPoint = DelTokenNode(insertPoint);
+			NextToken(&bodyNode);
+			token2 = bodyNode->mime->ppDef == NULL? bodyNode->mime:
+				ArgsRange[bodyNode->mime->ppArgNo*2+ARG_RANGE_BEGAN]->mime;
+			stringSize = strlen(token1->name)+ strlen(token2->name) +1;
+			newString = malloc(stringSize);
+			newString[0] = 0;
+			strcat(newString, token1->name);
+			strcat(newString, token2->name);
+			// 2. call lex to check
+			dSharpList.next = dSharpList.prev = &dSharpList;
+			Lex(NULL, newString, stringSize, &dSharpList); //FIXME: memery leak!
+			// 3. check if two token have been merged
+			if(dSharpList.next->next->mime->tokenType== EOFILE){
+				//two token have been merged!
+				//del the org one and insert the merged token.
+				insertPoint = DelTokenNode(insertPoint); 
+				insertPoint = InsertToken(insertPoint, dSharpList.next->mime);
+			} else {
+				insertPoint = InsertToken(insertPoint, token2);
+			}
+
+			//4. insert the tail token
+			if((bodyNode->mime->ppDef != NULL) && 
+				(ArgsRange[bodyNode->mime->ppArgNo*2+ARG_RANGE_BEGAN] 
+				!= ArgsRange[bodyNode->mime->ppArgNo*2+ARG_RANGE_END])) {
+				//token is format arg, translate it into actual argument.
+				for(currNode = (ArgsRange[bodyNode->mime->ppArgNo*2+ARG_RANGE_BEGAN]->next);
+					currNode != ArgsRange[bodyNode->mime->ppArgNo*2+ARG_RANGE_END];
+					currNode =  currNode->next){
+					insertPoint = InsertToken(insertPoint, currNode->mime);
+				}
+			}			
 			break;
 		case PP_SHARP:
 			token1 = NextToken(&bodyNode); //TODO: ERROR
-			token1 = InstantiateArg(ArgsArray,token1);
+			//token1 = InstantiateArg(ArgsArray,token1);
 			newToken = (MyToken*)malloc(sizeof(MyToken));
 			memset(newToken, 0 , sizeof(MyToken));
-			newToken->genToken1 = bodyNode->mime;
+			newToken->genToken1 = token1;
 			newToken->tokenType = SCON;
-			newToken->name = (char*)malloc(strlen(token1->name)+3);
-			sprintf(newToken->name, "\"%s\"", token1->name, token1->name);
+
+			//Concat all the actual argument to one  token
+			//1.cal the size
+			if(token1->ppDef != NULL) {
+				//token is format arg, translate it into actual argument.
+				for(currNode = ArgsRange[token1->ppArgNo*2+ARG_RANGE_BEGAN];
+					currNode != ArgsRange[token1->ppArgNo*2+ARG_RANGE_END];
+					currNode =  currNode->next){
+					stringSize = strlen(currNode->mime->name);
+				}
+
+			} else{
+				stringSize = strlen(token1->name);
+			}
+			newToken->name = (char*)malloc(stringSize+3);
+			memset(newToken->name, 0, stringSize+3);
+			strcat(newToken->name, "\"");
+			//2. Concat all the actual argument to one string
+			if(token1->ppDef != NULL) {
+				//token is format arg, translate it into actual argument.
+				for(currNode = ArgsRange[token1->ppArgNo*2+ARG_RANGE_BEGAN];
+					currNode != ArgsRange[token1->ppArgNo*2+ARG_RANGE_END];
+					currNode =  currNode->next){
+					strcat(newToken->name, currNode->mime->name);
+				}
+			} else{
+				strcat(newToken->name, currNode->mime->name);
+			}
+			strcat(newToken->name, "\"");
+			
 			insertPoint = InsertToken(insertPoint, newToken);
 			break;
 		default:
@@ -226,7 +289,14 @@ TokenNode* expand(TokenNode *tokenNode, Macro *macro)
 			break;
 		}			
 	}
-	
+
+	//del the original tokens
+	delNode=endTokenNode;
+	beganTokenNode = beganTokenNode->prev;
+	while(delNode != beganTokenNode)
+	{
+		delNode = DelTokenNode(delNode);
+	}
 	return ret;
 }
 

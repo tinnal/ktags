@@ -156,14 +156,12 @@ typedef struct _TokenNode
 
 
 
-
+int Lex(char* fileName, char* buf, int bufLen, TokenNode* tokenList);
 int OpenTokenFile(char *fileName, TokenNode *tokenList);
 MyToken* NextToken(TokenNode** nextNode);
 TokenNode*  AddToken(TokenNode* tokenList,  MyToken* token);
 TokenNode* DelTokenNode(TokenNode* delTokenNode);
-
 TokenNode* InsertToken(TokenNode* insertPoint,  MyToken* token);
-
 MyToken* NewToken(char *file, long startLine, long startCol,
 	long endLine, long endCol, char* tokenStart, char* tokenEnd, int type);
 
